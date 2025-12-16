@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+celery[redis]
+redis
+httpx
+sqlalchemy
+python-dotenv
+mlflow
+boto3
+joblib
+scikit-learn
+pandas
+numpy

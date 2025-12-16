@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+databases
+alembic
+pydantic
+python-dotenv
+psycopg2-binary
+httpx
+twilio
+sendgrid
