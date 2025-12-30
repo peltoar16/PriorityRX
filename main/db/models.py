@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Boolean, Integer, ForeignKey, Float, Text
+from sqlalchemy import Column, String, DateTime, Boolean, Integer, ForeignKey, Float, Text, false
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -12,15 +12,26 @@ def gen_uuid():
 class Patient(Base):
     __tablename__ = "patients"
     id = Column(String, primary_key=True, index=True)  # using string for demo (UUID)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    prefers_delivery = Column(Boolean, default=False)
     first_name = Column(String(100))
     last_name = Column(String(100))
     date_of_birth = Column(String, nullable=True)
+    address_line = Column(String, nullable=False)
+    city = Column(String, nullable=False)
+    state = Column(String, nullable=False)
+    zip_code = Column(String, nullable=False)
     phone = Column(String(32), nullable=True)
     email = Column(String(255), nullable=True)
     terminal_illness = Column(Boolean, default=False)
     icd10_primary_code = Column(String(20), nullable=True)
     icd10_additional_codes = Column(Text, nullable=True)
+    severity_score = Column(Float, nullable=True)
+    priority_level = Column(String, nullable=True)
+    last_scored_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    external_id = Column(String, index=True, unique=True)
 
 class Medication(Base):
     __tablename__ = "medications"
@@ -37,22 +48,30 @@ class Prescription(Base):
     id = Column(String, primary_key=True, index=True)
     patient_id = Column(String, ForeignKey("patients.id"))
     medication_id = Column(String, ForeignKey("medications.id"))
+    medication_name = Column(String, nullable=True)
     prescriber_id = Column(String, nullable=True)
     date_prescribed = Column(String, nullable=True)
     quantity = Column(Integer, nullable=True)
     days_supply = Column(Integer, nullable=True)
     dosage_instructions = Column(Text, nullable=True)
+    dosage = Column(Integer, nullable=True)
     refills_allowed = Column(Integer, default=0)
     refills_remaining = Column(Integer, default=0)
+    refill_count = Column(Integer, default=0)
     status = Column(String(50), default="active")
     pa_required = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    external_id = Column(String, index=True, unique=True)
+    is_controlled = Column(Boolean, nullable=True)
+    last_refill_at = Column(DateTime, default=datetime.utcnow)
 
 class Pharmacy(Base):
     __tablename__ = "pharmacies"
     id = Column(String, primary_key=True, index=True)
     name = Column(String(255))
     type = Column(String(50))
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
     street_address = Column(String(255), nullable=True)
     city = Column(String(100), nullable=True)
     state = Column(String(50), nullable=True)

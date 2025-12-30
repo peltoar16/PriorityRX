@@ -3,7 +3,6 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-
   minio:
     image: minio/minio:latest
     environment:
@@ -13,7 +12,6 @@ services:
     ports:
       - "9100:9000"
       - "9101:9001"
-
   minio-setup:
     image: minio/mc:latest
     depends_on:
@@ -24,14 +22,13 @@ services:
       mc alias set local http://minio:9000 minioadmin minioadmin &&
       mc mb -p local/mlflow-bucket || true
       "
-
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
     environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
-      MLFLOW_S3_IGNORE_TLS: "true"
     command: >
       mlflow server
       --backend-store-uri sqlite:///mlflow.db
@@ -44,3 +41,30 @@ services:
     depends_on:
       - minio
       - minio-setup
+  worker-critical:
+    build: .
+    command: celery -A celery worker --queues critical --concurrency 4 --loglevel info
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    depends_on:
+      - redis
+      - mlflow
+
+  worker-standard:
+    build: .
+    command: celery -A celery worker --queues standard --concurrency 2 --loglevel info
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    depends_on:
+      - redis
+      - mlflow

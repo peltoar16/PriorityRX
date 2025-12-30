@@ -1,11 +1,17 @@
 import os
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, JSON, MetaData, Table
-from sqlalchemy.sql import select
+from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./agent_demo.db')
 engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False} if DATABASE_URL.startswith('sqlite') else {})
+SessionLocal = sessionmaker(
+    bind=engine,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,  # IMPORTANT for Celery
+)
 metadata = MetaData()
 
 routing = Table('routing_decisions', metadata,
