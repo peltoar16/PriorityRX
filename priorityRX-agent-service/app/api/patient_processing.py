@@ -1,8 +1,12 @@
+import logging
+
 from pydantic import BaseModel
 from app.services.severity_service import score_patient, is_terminal
 from app.api import jobs
 from app.celery_app import celery
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -26,4 +30,5 @@ def process(req: PatientRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Agent processing failed")
+        logger.exception("Agent processing failed")
+        raise HTTPException(status_code=500, detail=str(e))

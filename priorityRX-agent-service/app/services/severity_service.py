@@ -1,12 +1,18 @@
+import logging
+
 import mlflow
 import mlflow.sklearn
 import numpy as np
 import joblib
 from pathlib import Path
 
+from fastapi import logger
+
 from app.mlflow_client import setup_mlflow
 from app.models.severity_model import load_model, predict
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "SeverityScoringModel"
 
@@ -25,46 +31,38 @@ def _load_model():
         )
     return joblib.load(MODEL_FILE)
 
+def predict(model, features: List[float]) -> float:
+    features_np = np.array(features, dtype=float).reshape(1, -1)
+
+    # Supports sklearn classifiers or regressors
+    if hasattr(model, "predict_proba"):
+        return float(model.predict_proba(features_np)[0][1])
+
+    return float(model.predict(features_np)[0])
+
 
 def log_and_register(features: list[float]) -> float:
     """
     Runs inference using a pre-trained model,
     logs the MLflow run, and registers the model.
     """
-    setup_mlflow()
-    model = _load_model()
+    model = get_model()
     features_np = np.array(features).reshape(1, -1)
 
-    with mlflow.start_run(run_name="severity_score_inference"):
+    severity_score = float(model.predict_proba(features_np)[0][1])
 
-        severity_score = float(model.predict_proba(features_np)[0][1])
+    try:
+        setup_mlflow()
+        with mlflow.start_run(run_name="severity_score_inference"):
+            mlflow.log_param("model_name", MODEL_NAME)
+            mlflow.log_param("feature_count", len(features))
+            mlflow.log_metric("severity_score", severity_score)
+    except Exception as e:
+        logger.warning(f"MLflow unavailable, continuing without logging: {e}")
 
-        # ---- Params ----
-        mlflow.log_param("model_name", MODEL_NAME)
-        mlflow.log_param("feature_count", len(features))
-
-        # ---- Metrics ----
-        mlflow.log_metric("severity_score", severity_score)
-
-        # ---- Model Artifact + Registry ----
-        mlflow.sklearn.log_model(
-            sk_model=model,
-            artifact_path="model",
-            registered_model_name=MODEL_NAME
-        )
-
-        return severity_score
+    return severity_score
 
 def score_patient(features: List[float]) -> float:
-    """
-    Compute a severity score for a patient based on features.
-
-    Args:
-        features (List[float]): Patient feature vector.
-
-    Returns:
-        float: Severity score between 0.0 (low) and 1.0 (high).
-    """
     if not isinstance(features, list):
         raise ValueError("features must be a list")
 
@@ -76,25 +74,19 @@ def score_patient(features: List[float]) -> float:
     if any(f is None for f in features):
         raise ValueError("features contain None")
 
-    # Use ML model to compute probability of critical/terminal state
-    model = get_model()
-    score = predict(model, features)
+    model = load_model()
+    severity_score = predict(model, features)
 
-    # Optional: clamp between 0 and 1
-    score = max(0.0, min(1.0, score))
-    return score
+    # Optional MLflow logging
+    try:
+        setup_mlflow()
+        with mlflow.start_run(run_name="patient_score_inference"):
+            mlflow.log_metric("severity_score", severity_score)
+    except Exception as e:
+        logger.warning(f"MLflow logging skipped: {e}")
+
+    return max(0.0, min(1.0, float(severity_score)))
 
 
 def is_terminal(severity_score: float) -> bool:
-    """
-    Determine whether the patient is considered terminal (critical).
-
-    Args:
-        severity_score (float): Severity score from score_patient.
-
-    Returns:
-        bool: True if patient is terminal, False otherwise.
-    """
-    # Example threshold; adjust based on clinical model calibration
-    TERMINAL_THRESHOLD = 0.85
-    return severity_score >= TERMINAL_THRESHOLD
+    return severity_score >= 0.85

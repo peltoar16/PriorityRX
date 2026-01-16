@@ -4,7 +4,7 @@ import numpy as np
 from typing import Dict
 from sklearn.ensemble import GradientBoostingRegressor
 
-MODEL_PATH = os.getenv('MODEL_PATH', 'models/demo_eta_model.joblib')
+MODEL_PATH = os.getenv('MODEL_PATH', 'artifacts/severity_model.joblib')
 
 class ModelManager:
     def __init__(self):
